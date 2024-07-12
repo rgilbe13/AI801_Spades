@@ -81,6 +81,9 @@ class Player:
         }
     
     def make_bet(self):
+	'''
+        Evaluates hand and given PT to make a viable bet
+        '''
         nil_bet = False
         expected_tricks = self.evaluate_regular_bet()
         if expected_tricks <= 2 and Card(0, 12) not in self.hand:
@@ -89,6 +92,12 @@ class Player:
 
 
     def evaluate_regular_bet(self):
+	'''
+        Iterates through the different suits to determine the expected trick take
+
+        Returns:
+        round(expected_tricks) int: The number of tricks expected to be taken with current hand
+        '''
         expected_tricks = 0
         for i in range(4):
             suit_arr = [card for card in self.hand if card.suit == i]
@@ -116,6 +125,12 @@ class Player:
         return round(expected_tricks)
 
     def evaluate_nil_bet(self):
+	'''
+        Checks if a nil bet is a viable choice
+
+        Returns:
+        bool: True if a nil bet is deemed to be a low risk option
+        '''
         for i in range(4):
             suit_arr = [card for card in self.hand if card.suit == i]
             suit_arr.reverse()
@@ -670,7 +685,7 @@ class MainGame(Game):
             self.players[i].hand.sort(key=sortFunc) # Sorts player hand
             self.players[i].tricks = 0
             self.players[i].make_bet()
-            print(f"Player {i} Bet = {self.players[i].bet}")
+            print(f"Player {i+1} Bet = {self.players[i].bet}")
         self.turns_remaining = 13
         self.play_round(self.players[0])
     

@@ -13,7 +13,6 @@ def sortFunc(e):
     return e.suit, e.val
 
 class Card:
-    
     def __init__(self,suit,val):
         self.suit = suit
         self.val = val
@@ -64,8 +63,68 @@ class Player:
         self.bags = 0
         self.score = 0
 
-    def make_bet():
-        pass
+        # Probability table for non-spades suits developed by Cohensius et al.
+        self.probability_table = {
+            0: {0: 0.997, 1: 0.966, 2: 0.817},
+            1: {0: 0.994, 1: 0.942, 2: 0.733},
+            2: {0: 0.990, 1: 0.907, 2: 0.624},
+            3: {0: 0.983, 1: 0.855, 2: 0.489},
+            4: {0: 0.970, 1: 0.779, 2: 0.350},
+            5: {0: 0.948, 1: 0.678, 2: 0.212},
+            6: {0: 0.915, 1: 0.544, 2: 0.095},
+            7: {0: 0.857, 1: 0.381, 2: 0.025},
+            8: {0: 0.774, 1: 0.214, 2: 0},
+            9: {0: 0.646, 1: 0.074, 2: 0},
+            10: {0: 0.462, 1: 0, 2: 0},
+            11: {0: 0.227, 1: 0, 2: 0},
+            12: {0: 0, 1: 0, 2: 0}
+        }
+    
+    def make_bet(self):
+        nil_bet = False
+        expected_tricks = self.evaluate_regular_bet()
+        if expected_tricks <= 2 and Card(0, 12) not in self.hand:
+            nil_bet = self.evaluate_nil_bet()
+        self.bet = 0 if nil_bet else expected_tricks
+
+
+    def evaluate_regular_bet(self):
+        expected_tricks = 0
+        for i in range(4):
+            suit_arr = [card for card in self.hand if card.suit == i]
+            suit_arr.reverse()
+            suit_count = len(suit_arr)
+            if i == 0: # Case for evaluating Spades
+                for index, card in enumerate(suit_arr):
+                    higher_cards = abs(card.val - 12)
+                    # A spade is worth a trick if it has more spades in hand than number of un-owned higher-ranked spades
+                    if (suit_count > higher_cards-index): 
+                        expected_tricks+=1
+                if suit_count >= 5: # Adds a bet for every spade in hand after the fifth
+                    expected_tricks += suit_count - 4
+            else: # Case for non-Spade suits
+                probabilities = self.probability_table[suit_count]
+                for card in suit_arr:
+                    if card.val == 12:
+                        expected_tricks += probabilities[0]
+                    elif card.val == 11:
+                        expected_tricks += probabilities[1]
+                    elif card.val == 10: 
+                        expected_tricks += probabilities[2]
+                    else:
+                        break
+        return round(expected_tricks)
+
+    def evaluate_nil_bet(self):
+        for i in range(4):
+            suit_arr = [card for card in self.hand if card.suit == i]
+            suit_arr.reverse()
+            last_three = suit_arr[-3:] # Gets the three lowest value cards for the given suit
+            if last_three[0].val > 8: # Checks if the suit hand is 'unsafe' (Bottom 3 value cards contain J or greater)
+                return False
+        print('ATTEMPTING NIL')
+        return True
+
     
     def make_move(self):
         pass
@@ -152,12 +211,6 @@ class AIPlayer(Player):
 class ISMCTSPlayer(Player):
     def __init__(self):
         super().__init__()
-    
-    def make_bet(self):
-        '''
-        Makes a bet for the player
-        '''
-        self.bet = random.randint(2,5)
 
     def make_move(self, game, iterations = 1500):
         '''
@@ -304,7 +357,7 @@ class MCTSNode:
             ai_team = game.teams[game.ai_team_index]
             opp_team = game.teams[opp_index]
             self.score_sum += ((ai_team.score-5*ai_team.bags)-(opp_team.score-5*opp_team.bags)/constant)
-            #self.expected_score = ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags)/0.7)
+            self.expected_score = ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags)/0.7)
         else:
             highest_score = highest_score_index = 0
             ai_player = game.players[game.ai_player_index]
@@ -315,8 +368,8 @@ class MCTSNode:
                         highest_score_index = index
             opp_player = game.players[highest_score_index]
             self.score_sum += ((ai_player.score-5*ai_player.bags)-(opp_player.score-5*opp_player.bags)/constant)
-            #self.expected_score = ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags)/constant)
-        self.expected_score = self.score_sum/self.visits # Takes the average of all score outcomes
+            self.expected_score = ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags)/constant)
+        #self.expected_score = self.score_sum/self.visits # Takes the average of all score outcomes
 
 
     def UCT(self, valid_cards, constant = 0.7):
@@ -649,7 +702,7 @@ class MainGame(Game):
             
 
 p1 = AIPlayer()
-p2 = AIPlayer()
+p2 = ISMCTSPlayer()
 p3 = AIPlayer()
 p4 = ISMCTSPlayer()  
 g = MainGame([p1,p2,p3,p4], True)      

@@ -19,12 +19,10 @@ def play_game(game):
         state.update_current_player(state.current_player.next_player)
 
     while not game.is_terminal(state):
+        print("--Actual Game Loop--")
         player = state.current_player
         
         move = player.make_move(game, state.new())
-        
-        #if verbose: 
-        print(state.current_player, ' Actual Move: ', move)
 
         state = game.result(state, move)
 

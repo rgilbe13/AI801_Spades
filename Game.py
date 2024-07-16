@@ -68,15 +68,15 @@ class GameState():
                     if verbose:
                         print("Spades Broken")
 
+        if verbose:
+            time.sleep(2)
+            print(self.current_player, " played ", card)
+            self.current_trick.print()                           
+
         if len(self.current_trick.cards) == 4:
             self.end_round()
         else:
-            self.update_current_player(self.current_player.next_player)
-
-        if verbose:
-            time.sleep(2)
-            print(self.current_player, " is playing ", card)
-            self.current_trick.print()          
+            self.update_current_player(self.current_player.next_player)       
 
     def end_round(self):
         self.update_current_player(self.current_trick.evaluate_trick())
@@ -123,6 +123,8 @@ class Spades():
         return 1
 
     def is_terminal(self, state):
+        print("Cards Laid: ", state.cards_laid)
+        print("Is Terminal: ", state.cards_laid == 52)
         if state.cards_laid == 52:
             return True
         else:

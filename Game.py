@@ -42,16 +42,16 @@ class Trick:
 
 
 class GameState():
-    def __init__(self, starting_player):
+    def __init__(self, dealer):
         self.current_trick = Trick()
         self.trick_history = []
-        self.current_player = starting_player
-        self.dealer = None
-        self.phase = Phase.BID
+        self.current_player = dealer.next_player
+        self.dealer = dealer
         self.spades_broken = False
         self.cards_laid = 0
         self.team_mode = False
         self.teams = []
+        starting_player = self.current_player
         if starting_player.team_name != "":
             self.team_mode = True
             teams = {}
@@ -105,7 +105,8 @@ class GameState():
             print("Break")
             #self.print_scores()
             is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
-            self.declare_winner() if is_winner else self.start_new_set()
+            if is_winner:
+                self.new_game()
 
 
     def update_current_player(self, player):
@@ -127,6 +128,37 @@ class GameState():
                 print_cards(valid_cards)
             return valid_cards
     
+
+    def build_deck(self):
+        deck = []
+        for s in range(4):
+            for v in range(13):
+                card = Card(s, v)
+                if card not in deck:
+                    deck.append(card)
+        return deck
+    
+    def deal_hand(self):
+        deck = self.build_deck()
+        random.shuffle(deck)
+        for _ in range(4):
+            for _ in range(13):
+                card = deck.pop()
+                self.current_player.hand.append(card)
+            self.update_current_player(self.current_player.next_player)
+
+    def new_game(self):
+        self.current_trick = Trick()
+        self.trick_history = []
+        self.dealer = self.dealer.next_player
+        self.current_player = self.dealer.next_player
+        self.spades_broken = False
+        self.cards_laid = 0        
+        self.deal_hand()
+        for _ in range(4):
+            self.current_player.make_bet()
+            self.update_current_player(self.current_player.next_player)        
+
     def get_player_score_and_bags(self, bet, tricks):
 
         if bet == 0:
@@ -221,24 +253,3 @@ class Spades():
         
     def display(self, state): 
         print(state)
-
-    def build_deck(self):
-        deck = []
-        for s in range(4):
-            for v in range(13):
-                card = Card(s, v)
-                if card not in deck:
-                    deck.append(card)
-        return deck
-    
-    def deal_hand(self, state):
-        deck = self.build_deck()
-        random.shuffle(deck)
-        for _ in range(4):
-            for _ in range(13):
-                card = deck.pop()
-                state.current_player.hand.append(card)
-            state.update_current_player(state.current_player.next_player)
-
-    def new_game(self, state):
-        self.deal_hand(state)

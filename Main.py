@@ -12,11 +12,7 @@ p4.set_next_player(p1)
 
 def play_game(game):
     state = game.initial
-    game.new_game(state)
-
-    for _ in range(4):
-        state.current_player.make_bet()
-        state.update_current_player(state.current_player.next_player)
+    state.new_game()
 
     while not game.is_terminal(state):
         print("--Actual Game Loop--")

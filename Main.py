@@ -1,9 +1,9 @@
 from Game import *
 
-p1 = AIPlayer("Tom")
-p2 = AIPlayer("Bruce")
-p3 = AIPlayer("Randy")
-p4 = MINMAXPlayer("Rex")
+p1 = AIPlayer("Tom", "Donkey")
+p2 = AIPlayer("Bruce", "Elephant")
+p3 = AIPlayer("Randy", "Donkey")
+p4 = MINMAXPlayer("Rex", "Elephant")
 
 p1.set_next_player(p2)
 p2.set_next_player(p3)
@@ -22,7 +22,7 @@ def play_game(game):
         print("--Actual Game Loop--")
         player = state.current_player
         
-        move = player.make_move(game, state.new())
+        move = player.make_move(game, state)
 
         state = game.result(state, move)
 

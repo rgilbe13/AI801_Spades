@@ -9,14 +9,18 @@ def sortFunc(e):
 
 class Player():
 
-    def __init__(self, name):
+    def __init__(self, name, team_name):
         self.name = name
+        self.team_name = team_name
         self.hand = []
         self.bet = 0
         self.tricks = 0
         self.bags = 0
         self.score = 0
         self.next_player = None
+
+    def addTrick(self):
+        self.tricks += 1
 
     def remove_card(self, card):
         if self.hand.count(card) == 1:
@@ -68,8 +72,8 @@ class Player():
     
     
 class AIPlayer(Player):
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
 
     def make_bet(self):
         self.bet = random.randint(2,5)
@@ -82,8 +86,8 @@ class AIPlayer(Player):
 
 
 class MINMAXPlayer(Player):
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
 
     def make_move(self, game, state):
         v, move = minimax_search(game, state)
@@ -93,9 +97,10 @@ class MINMAXPlayer(Player):
         self.bet = random.randint(2, 5)
 
 
-
 class Team:
     def __init__(self, p1, p2):
         self.members = [p1, p2]
         self.bags = 0
         self.score = 0        
+        self.tricks = 0
+        self.bet = 0

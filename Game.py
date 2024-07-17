@@ -50,10 +50,24 @@ class GameState():
         self.phase = Phase.BID
         self.spades_broken = False
         self.cards_laid = 0
+        self.team_mode = False
+        self.teams = []
+        if starting_player.team_name != "":
+            self.team_mode = True
+            teams = {}
+            teams[starting_player.team_name] = [starting_player]
+            while starting_player.next_player != self.current_player:
+                starting_player = starting_player.next_player
+                if teams.get(starting_player.team_name) == None:
+                    teams[starting_player.team_name] = [starting_player]
+                else:
+                    teams[starting_player.team_name].append(starting_player)
+
+            for t in teams.values():
+                self.teams.append(Team(t[0], t[1]))
+
 
     def new(self):
-        if verbose:
-            print("Return deepcopy")
         return deepcopy(self)
 
     def lay_card(self, card):
@@ -69,7 +83,7 @@ class GameState():
                         print("Spades Broken")
 
         if verbose:
-            time.sleep(2)
+            #time.sleep(4)
             print(self.current_player, " played ", card)
             self.current_trick.print()                           
 
@@ -80,11 +94,19 @@ class GameState():
 
     def end_round(self):
         self.update_current_player(self.current_trick.evaluate_trick())
+        self.current_player.addTrick()
         self.trick_history.append(self.current_trick)
         self.current_trick = Trick()
         if verbose:
-            time.sleep(1)
             print(self.current_player, "is the winner")
+
+        if self.cards_laid == 52:
+            self.assign_score_and_bags() # Tallys points at the end of a round
+            print("Break")
+            #self.print_scores()
+            is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
+            self.declare_winner() if is_winner else self.start_new_set()
+
 
     def update_current_player(self, player):
         self.current_player = player
@@ -103,8 +125,75 @@ class GameState():
             if verbose:
                 print(self.current_player, " can play...")
                 print_cards(valid_cards)
-                time.sleep(1)
             return valid_cards
+    
+    def get_player_score_and_bags(self, bet, tricks):
+
+        if bet == 0:
+            score, bags = self.check_nil_bet(tricks)
+        else:
+            score, bags = self.get_round_score(bet, tricks)
+        return score, bags
+    
+    def get_round_score(self, bet, tricks):
+
+        score = -bet*10 if tricks < bet else bet*10
+        bags = tricks-bet if tricks > bet else 0 # Adds bags to player total if bet was exceeded
+        return score, bags
+    
+    def check_nil_bet(self, tricks):
+
+        if tricks == 0:
+            score = 100
+            bags = 0
+        else:
+            score = -100
+            bags = tricks
+        return score, bags
+
+    def assign_score_and_bags(self):
+ 
+        if self.team_mode: # Case if playing with teams
+            for team in self.teams:
+                for player in team.members: # Adds each team members score and bag sum to the team score and bag count
+                    if player.bet == 0:
+                        player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
+                        team.score += player_round_totals[0] # Round Score
+                        team.bags += player_round_totals[1] # Round Bags
+                    else:
+                        team.tricks += player.tricks
+                        team.bet += player.bet
+                round_totals = self.get_round_score(team.bet, team.tricks)
+                team.score += round_totals[0]
+                team.bags += round_totals[1]
+                if team.bags >= 10: # Check for bag penalty
+                    team.score -= 100
+                    team.bags -= 10
+        else: # Case if playing individually
+            for player in self.players:
+                round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
+                player.score += round_totals[0] # Round Score
+                player.bags += round_totals[1] # Round Bags
+                if player.bags >= 10:
+                    player.score -= 100
+                    player.bags -= 10
+    
+    def check_for_winner(self, player_array):
+
+        is_winner = False
+        for p in player_array:
+            if p.score > 500:
+                is_winner = True
+                break
+        return is_winner
+
+    def print_scores(self):
+        if self.team_mode:
+            for t in self.teams:
+                print(t.score,"(",t.bags,")")
+        # else:
+        #     for p in self.players:
+        #         print(p.score,"(",p.bags,")")            
         
 class Spades():
     def __init__(self, starting_player):
@@ -114,7 +203,7 @@ class Spades():
         return state.actions()
 
     def result(self, state, action):
-        #state = state.new()
+        state = state.new()
         state.lay_card(action)
         
         return state
@@ -123,8 +212,8 @@ class Spades():
         return 1
 
     def is_terminal(self, state):
-        print("Cards Laid: ", state.cards_laid)
-        print("Is Terminal: ", state.cards_laid == 52)
+        #print("Cards Laid: ", state.cards_laid)
+        #print("Is Terminal: ", state.cards_laid == 52)
         if state.cards_laid == 52:
             return True
         else:
@@ -152,4 +241,4 @@ class Spades():
             state.update_current_player(state.current_player.next_player)
 
     def new_game(self, state):
-        self.deal_hand(state) 
+        self.deal_hand(state)

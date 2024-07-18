@@ -11,9 +11,8 @@ def minimax_search(game, state):
     def max_value(state):
         global search_depth
         search_depth += 1
-        print("Depth: ", search_depth)
         #time.sleep(2)
-        if game.is_terminal(state) or search_depth > max_depth:
+        if game.is_terminal(state) or search_depth > 3000:
             return game.utility(state, state.current_player), None
         v, move = -infinity, None
         for a in game.actions(state):
@@ -25,9 +24,8 @@ def minimax_search(game, state):
     def min_value(state):
         global search_depth
         search_depth += 1
-        print("Depth: ", search_depth)
         #time.sleep(2)
-        if game.is_terminal(state) or search_depth > max_depth:
+        if game.is_terminal(state) or search_depth > 3000:
             return game.utility(state, state.current_player), None
         v, move = +infinity, None
         for a in game.actions(state):
@@ -35,5 +33,5 @@ def minimax_search(game, state):
             if v2 < v:
                 v, move = v2, a
         return v, move
-    max_depth = 0
+    search_depth = 0
     return max_value(state)

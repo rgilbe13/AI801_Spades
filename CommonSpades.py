@@ -9,7 +9,7 @@ sys.setrecursionlimit(10000500)
 def cache(func):
     return func
 
-verbose=True
+verbose=False
 
 class Phase(Enum):
     BID = 1

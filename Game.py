@@ -102,7 +102,6 @@ class GameState():
 
         if self.cards_laid == 52:
             self.assign_score_and_bags() # Tallys points at the end of a round
-            print("Break")
             #self.print_scores()
             is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
             if is_winner:

@@ -15,9 +15,12 @@ state = GameState(p1)
 state.deal_hand()
 
 while not game.is_terminal(state):
-    print("--Actual Game Loop--")
+
     player = state.current_player
     
     move = player.make_move(game, state)
-
+    print(player," played ", move)
     state = game.result(state, move)
+
+
+print("end")

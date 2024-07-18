@@ -51,6 +51,7 @@ class GameState():
         self.cards_laid = 0
         self.team_mode = False
         self.teams = []
+        self.rounds = 1
         starting_player = self.current_player
         if starting_player.team_name != "":
             self.team_mode = True
@@ -88,11 +89,11 @@ class GameState():
             self.current_trick.print()                           
 
         if len(self.current_trick.cards) == 4:
-            self.end_round()
+            self.end_hand()
         else:
             self.update_current_player(self.current_player.next_player)       
 
-    def end_round(self):
+    def end_hand(self):
         self.update_current_player(self.current_trick.evaluate_trick())
         self.current_player.addTrick()
         self.trick_history.append(self.current_trick)
@@ -101,11 +102,14 @@ class GameState():
             print(self.current_player, "is the winner")
 
         if self.cards_laid == 52:
-            self.assign_score_and_bags() # Tallys points at the end of a round
-            #self.print_scores()
-            is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
-            if is_winner:
-                self.new_game()
+            self.end_round()
+
+    def end_round(self):
+        self.assign_score_and_bags() # Tallys points at the end of a round
+        #self.print_scores()
+        is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
+        if not is_winner:
+            self.new_game()
 
 
     def update_current_player(self, player):
@@ -152,7 +156,8 @@ class GameState():
         self.dealer = self.dealer.next_player
         self.current_player = self.dealer.next_player
         self.spades_broken = False
-        self.cards_laid = 0        
+        self.cards_laid = 0
+        self.rounds += 1     
         self.deal_hand()
         for _ in range(4):
             self.current_player.make_bet()
@@ -240,6 +245,38 @@ class Spades():
         return state
 
     def utility(self, state, player):
+        team = None
+
+        for t in state.teams:
+            for member in t.members:
+                if player == member:
+                    team = t
+
+        player = team.members[0]
+        partner = team.members[1]
+
+        team_bet = (player.bet + partner.bet)
+
+        remaining_cards = []
+        remaining_cards.extend(player.hand)
+        remaining_cards.extend(partner.hand)
+
+        high_card_points = sum([4 if card.val == 12 else 3 if card.val == 11 else 2 if card.val == 10 else 1 if card.val == 9 else 0 for card in remaining_cards])
+        expected_tricks = high_card_points // 4
+
+
+        spades_count = sum(1 for card in remaining_cards if card.suit == 0)
+        distribution_factor = spades_count - (13 / 4) 
+        expected_tricks += distribution_factor * 0.5
+        
+        lead_control_points = sum([1 for card in remaining_cards if card.val in [12, 11]])
+        
+        bid_difference = abs(player.tricks - player.bet) + abs(partner.tricks - partner.bet)
+        
+        heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+    
+        return heuristic_value        
+
         return 1
 
     def is_terminal(self, state):

@@ -3,7 +3,6 @@ import time
 infinity = math.inf
 
 search_depth = 0
-max_depth = 3000
 
 def minimax_search(game, state):
     global search_depth

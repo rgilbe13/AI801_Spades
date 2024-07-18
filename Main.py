@@ -10,16 +10,14 @@ p2.set_next_player(p3)
 p3.set_next_player(p4)
 p4.set_next_player(p1)
 
-def play_game(game):
-    state = game.initial
-    state.new_game()
+game = Spades()
+state = GameState(p1)
+state.deal_hand()
 
-    while not game.is_terminal(state):
-        print("--Actual Game Loop--")
-        player = state.current_player
-        
-        move = player.make_move(game, state)
+while not game.is_terminal(state):
+    print("--Actual Game Loop--")
+    player = state.current_player
+    
+    move = player.make_move(game, state)
 
-        state = game.result(state, move)
-
-play_game(Spades(p1))
+    state = game.result(state, move)

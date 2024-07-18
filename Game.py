@@ -45,8 +45,8 @@ class GameState():
     def __init__(self, dealer):
         self.current_trick = Trick()
         self.trick_history = []
-        self.current_player = dealer.next_player
         self.dealer = dealer
+        self.current_player = self.dealer.next_player
         self.spades_broken = False
         self.cards_laid = 0
         self.team_mode = False
@@ -228,8 +228,8 @@ class GameState():
         #         print(p.score,"(",p.bags,")")            
         
 class Spades():
-    def __init__(self, starting_player):
-        self.initial = GameState(starting_player)
+    def __init__(self):
+        pass
 
     def actions(self, state):
         return state.actions()

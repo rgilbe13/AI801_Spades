@@ -1,6 +1,8 @@
 import random
 import numpy as np
+import math
 from copy import deepcopy
+import time
 
 
 suit_dict = {0: '♠', 1: '♣', 2: '♥', 3: '♦'}
@@ -9,7 +11,10 @@ val_dict = {0: '2', 1: '3', 2: '4', 3: '5',
         8: '10', 9: 'J', 10: 'Q', 11: 'K',
         12: 'A'}
 
-def sortFunc(e):
+def sortVal(e):
+    return e.val
+
+def sortSuitAndVal(e):
     return e.suit, e.val
 
 class Card:
@@ -24,7 +29,7 @@ class Card:
 
 class Trick:
     def __init__(self):
-        self.cards = [None for i in range(4)]
+        self.cards = [None for _ in range(4)]
         self.opening_suit = None
         self.spades_broken = False
     
@@ -50,8 +55,11 @@ class Trick:
 class Team:
     def __init__(self, p1, p2):
         self.members = [p1, p2]
+        self.tricks = 0
+        self.bet = 0
         self.bags = 0
         self.score = 0
+
 	        
 class Player:
 
@@ -79,9 +87,14 @@ class Player:
             11: {0: 0.227, 1: 0, 2: 0},
             12: {0: 0, 1: 0, 2: 0}
         }
+
+    def __eq__(self, other):
+        if not isinstance(other, Player):
+            return NotImplemented
+        return self.hand == other.hand
     
     def make_bet(self):
-	'''
+        '''
         Evaluates hand and given PT to make a viable bet
         '''
         nil_bet = False
@@ -92,7 +105,7 @@ class Player:
 
 
     def evaluate_regular_bet(self):
-	'''
+        '''
         Iterates through the different suits to determine the expected trick take
 
         Returns:
@@ -104,12 +117,13 @@ class Player:
             suit_arr.reverse()
             suit_count = len(suit_arr)
             if i == 0: # Case for evaluating Spades
-                for index, card in enumerate(suit_arr):
-                    higher_cards = abs(card.val - 12)
-                    # A spade is worth a trick if it has more spades in hand than number of un-owned higher-ranked spades
-                    if (suit_count > higher_cards-index): 
+                high_value_spades = [card for card in suit_arr if card.val >= 9] # Only concerned with spades of val J-A
+                for index, card in enumerate(high_value_spades):
+                    higher_value_cards = abs(12 - card.val)
+                    # The J-Q-K-A spades are each worth a trick if there are more spades in hand than number of un-owned higher-ranked spades
+                    if (suit_count > higher_value_cards-index): # Subtract number of higher owned cards
                         expected_tricks+=1
-                if suit_count >= 5: # Adds a bet for every spade in hand after the fifth
+                if suit_count >= 5: # Add a trick for every spade in hand over the fourth
                     expected_tricks += suit_count - 4
             else: # Case for non-Spade suits
                 probabilities = self.probability_table[suit_count]
@@ -125,7 +139,7 @@ class Player:
         return round(expected_tricks)
 
     def evaluate_nil_bet(self):
-	'''
+        '''
         Checks if a nil bet is a viable choice
 
         Returns:
@@ -135,7 +149,7 @@ class Player:
             suit_arr = [card for card in self.hand if card.suit == i]
             suit_arr.reverse()
             last_three = suit_arr[-3:] # Gets the three lowest value cards for the given suit
-            if last_three[0].val > 8: # Checks if the suit hand is 'unsafe' (Bottom 3 value cards contain J or greater)
+            if len(last_three) > 0 and last_three[0].val > 8: # Checks if the suit hand is 'unsafe' (Bottom 3 value cards contain J or greater)
                 return False
         print('ATTEMPTING NIL')
         return True
@@ -168,7 +182,7 @@ class Player:
                 valid_hand.append(card)
         if len(valid_hand) == 0: # Returns total hand if player can't match played suit
             valid_hand = deepcopy(self.hand)
-        valid_hand.sort(key=sortFunc)
+        valid_hand.sort(key=sortSuitAndVal)
         return valid_hand
     
 class HumanPlayer(Player):
@@ -209,12 +223,9 @@ class HumanPlayer(Player):
         return selected_card
     
     
-class AIPlayer(Player):
+class RandomPlayer(Player):
     def __init__(self):
         super().__init__()
-
-    def make_bet(self):
-        self.bet = random.randint(2,5)
 
     def make_move(self, trick):
         valid_hand = self.get_valid_cards(trick.opening_suit, trick.spades_broken)
@@ -227,7 +238,7 @@ class ISMCTSPlayer(Player):
     def __init__(self):
         super().__init__()
 
-    def make_move(self, game, iterations = 1500):
+    def make_move(self, game, iterations = 50):
         '''
         Chooses card to play using ISMCTS
 
@@ -238,23 +249,40 @@ class ISMCTSPlayer(Player):
         Returns:
         move Card: card to be played in the actual game
         '''
-        root = MCTSNode()
-        self.print_hand()
-        for _ in range(iterations):
-            #print("I = "+str(i))
-            node = root
-            clone_game = self.determinize(game.clone_game()) # Randomizes non-player hands
-            self.MCTS(clone_game, node)
-        max_visits = 0
-        move = None
-        for child in root.children:
-            if child.visits > max_visits:
-                max_visits = child.visits
-                move = child.last_card
+        valid_hand = self.get_valid_cards(game.trick.opening_suit, game.trick.spades_broken)
+        if len(valid_hand) > 1: # Only runs MCTS if player has a choice of cards
+            root = MCTSNode()
+            self.print_hand()
+            start = time.time()
+            unseen_cards = self.get_unseen_cards(game) # Cards that are yet to be played from other players
+            iterations = min(iterations+(50*(13-game.turns_remaining)), 2500)
+            for _ in range(iterations):
+                node = root
+                clone_game = self.determinize(game.clone_game(), deepcopy(unseen_cards)) # Randomizes non-player hands
+                self.MCTS(clone_game, node)
+            max_visits = 0
+            move = None
+            for child in root.children:
+                if child.visits > max_visits:
+                    max_visits = child.visits
+                    move = child.last_card
+            end = time.time()
+            duration = end-start
+            print(f"Time to make decision: {duration} seconds")
+        else:
+            move = valid_hand[0]
         self.hand.remove(move)
         return move
+    
+    def get_unseen_cards(self, game):
+        unseen_cards = []
+        for p in game.players: # Collects all of the unseen cards
+            if p != game.players[game.curr_player_index]:
+                for c in p.hand:
+                    unseen_cards.append(c)
+        return unseen_cards
 
-    def determinize(self, game):
+    def determinize(self, game, unseen_cards):
         '''
         Randomizes the hands of each non-MCTS player
 
@@ -264,23 +292,54 @@ class ISMCTSPlayer(Player):
         Returns:
         game SimGame: copy of game state with randomized hands
         '''
-        unseen_cards = []
-        hand_sizes = [0 for _ in range(4)] # Saves how many cards each player has before randomizing
-        for index, p in enumerate(game.players): # Collects all of the unseen cards
-            if p != game.players[game.player_index]:
-                hand_sizes[index] = len(p.hand)
-                for c in p.hand:
-                    unseen_cards.append(c)
-                p.hand = []
+        # TODO Deal back cards so that players with higher bids recieve more high value cards
         random.shuffle(unseen_cards)
+        high_value_cards = [card for card in unseen_cards if card.suit == 0 and card.val >= 6 or card.val >= 10] # Gets card with high-trick taking potential
+        high_value_count = len(high_value_cards)
+        unseen_cards = [card for card in unseen_cards if card not in high_value_cards] # Removes duplicate cards from unseen_cards
+        total_bet_difference = 0
+        hand_sizes = [0 for _ in range(4)]
+
+        # hvc_copy = deepcopy(high_value_cards)
+        # unseen_copy = deepcopy(unseen_cards)
+        # betdiff_arr = [0 for _ in range(4)]
+        # ctd_arr = [0 for _ in range(4)]
+
+        
+        # Takes each player's hand size and an estiamte of how many high value cards they are likely to hold
+        for index, p in enumerate(game.players):
+            if p != game.players[game.curr_player_index]:
+                hand_sizes[index] = len(p.hand)
+                total_bet_difference += max(0,((p.bet-p.tricks)))
+                p.hand = []
+
+        # Deal high value cards based on which players are most likely to have them
+        if (total_bet_difference > 0):
+            for index, p in enumerate(game.players):
+                if p != game.players[game.curr_player_index]:
+                    player_bet_difference = max(0, p.bet-p.tricks)
+                    high_card_likelihood = player_bet_difference/total_bet_difference
+                    cards_to_draw = math.ceil(high_value_count*high_card_likelihood) if math.ceil(high_value_count*high_card_likelihood) < hand_sizes[index] else hand_sizes[index]
+                    # betdiff_arr[index] = player_bet_difference
+                    # ctd_arr[index] = cards_to_draw
+                    for _ in range(cards_to_draw):
+                        if (len(high_value_cards) > 0):
+                            p.hand.append(high_value_cards[0])
+                            high_value_cards.pop(0)
+        
+        if len(high_value_cards) > 0:
+            unseen_cards.extend(high_value_cards)
+            random.shuffle(unseen_cards)
+
+        # Deals the remainder of the deck
         for index, p in enumerate(game.players): # Inserts randomized cards back into non-player hands
-            if p != self:
-                #print(f"Player {index} => [ ", end = "")
-                for _ in range(hand_sizes[index]):
-                    game.players[index].hand.append(unseen_cards[0])
-                    #print(f"{val_dict[unseen_cards[0].val]}{suit_dict[unseen_cards[0].suit]}", end = " ")
-                    unseen_cards.pop(0)
-                    
+            if p != game.players[game.curr_player_index]:
+                hand_remainder = hand_sizes[index]-len(p.hand)
+                for _ in range(hand_remainder):
+                    if (len(unseen_cards) == 0):
+                        print("Hello")
+                    p.hand.append(unseen_cards[0])
+                    unseen_cards.pop(0) 
         return game
 
     def MCTS(self, game, node):
@@ -293,31 +352,108 @@ class ISMCTSPlayer(Player):
         '''
 
         # Select child nodes up to a leaf
-        while len(node.children) > 0 and node.is_fully_expanded(game.get_player_valid_cards()):
-            node = node.UCT(game.get_player_valid_cards())
-            game.play_card(node.last_card)
+        while len(node.children) > 0:
+            valid_cards = game.get_player_valid_cards()
+            if node.is_fully_expanded(valid_cards):
+                node = node.UCT(valid_cards)
+                game.play_card(node.last_card)
+            else:
+                break
 
         # Expand non-terminal leaf node
-        player = game.players[game.player_index]
         child_cards = [child.last_card for child in node.children]
         valid_cards =  game.get_player_valid_cards()
         valid_cards[:] = [card for card in valid_cards if card not in child_cards]
         if len(valid_cards) > 0:
             random_card = random.choice(valid_cards)
-            child = MCTSNode(node, random_card, player)
+            child = MCTSNode(node, random_card, game.players[game.curr_player_index])
             node.children.append(child)
-            node = child
             game.play_card(random_card)
+            node = child
 
         # Simulate remainder of round
         while (game.turns_remaining) > 0:
             valid_cards = game.get_player_valid_cards()
-            game.play_card(random.choice(valid_cards))
+            probable_card = self.guess_next_card(game, valid_cards)
+            # if probable_card is None:
+            #     probable_card = random.choice(valid_cards)
+            game.play_card(probable_card)
             
         # Backpropigate to root
         while node is not None:
             node.update_node(game)
             node = node.parent
+
+    def guess_next_card(self, game, valid_cards):
+        '''
+        Evaluates a given players hand to logically assess their most likely next move
+
+        Parameters:
+        game SimGame: copy of the current game state
+        valid_cards Card[]: Array of Cards that a player can legally play
+
+        Returns:
+        Card: The most beneficial card a player can play based on a series of conditions
+        '''
+        trick_suit = game.trick.opening_suit
+        current_player = game.players[game.curr_player_index]
+        cards_in_trick = [card for card in game.trick.cards if card is not None]
+        suits_in_hand = [card for card in valid_cards if card.suit == trick_suit] # Cards in player hand that match trick suit
+        spades_in_trick = []
+        spades_in_hand = []
+        if trick_suit != 0:
+            spades_in_trick = [card for card in game.trick.cards if card is not None and card.suit == 0]
+            spades_in_hand = [card for card in valid_cards if card.suit == 0] # Cards in player hand that are spades
+        
+        # Case if cards have been played in the trick
+        if len(cards_in_trick) > 0:
+            
+            # Case for regular bets
+            if (current_player.bet != 0): 
+                if len(spades_in_hand) > 0 and trick_suit != 0: # Checks if a playing a spade is possible
+                    if len(spades_in_trick) > 0: # Checks if a spade has already been played
+                        highest_spade = max(spades_in_hand, key=lambda card: card.val)
+                        if highest_spade.val > max(spades_in_hand, key=lambda card: card.val).val: 
+                            return highest_spade
+                    return min(spades_in_hand, key=lambda card: card.val)
+                elif len(suits_in_hand) > 0: # Checks if player has suits matching the trick
+                    highest_card_of_trick = max(cards_in_trick, key=lambda card: card.val and card.suit == trick_suit and card is not None)
+                    max_of_suit = max(suits_in_hand, key=lambda card: card.val)
+                    min_of_suit = min(suits_in_hand, key=lambda card: card.val)
+                    if max_of_suit.val > highest_card_of_trick.val and len(spades_in_trick) == 0: # Checks if player can take the trick
+                        return max_of_suit
+                    else:
+                        return min_of_suit
+                else: # Checks if player has no spades or matching suits
+                    valid_cards.sort(key=sortVal)
+                    return valid_cards[0] # Returns lowest value of another suit
+
+            # Case for nil bets
+            else:
+                if len(spades_in_trick) > 0 and len(spades_in_hand) > 0: # Checks if a spade can be safely discarded
+                    highest_spade = max(spades_in_hand, key=lambda card: card.val)
+                    if highest_spade.val < max(spades_in_trick, key=lambda card: card.val).val:  
+                        return highest_spade
+                if len(suits_in_hand) > 0:
+                    highest_card_of_trick = max(cards_in_trick, key=lambda card: card.val and card.suit == trick_suit and card is not None)
+                    max_of_suit = max(suits_in_hand, key=lambda card: card.val)
+                    min_of_suit = min(suits_in_hand, key=lambda card: card.val)
+                    if (max_of_suit.val < highest_card_of_trick.val) or len(spades_in_trick) > 0:
+                        return max_of_suit
+                    else:
+                        return min_of_suit
+                else:
+                    valid_cards.sort(key=sortVal)
+                    return valid_cards[-1] # Returns highest value of another suit to be safely discarded
+        
+        # Case if player is first to play card
+        else:
+            if (current_player.bet != 0): 
+                valid_cards.sort(key=sortVal)
+                return valid_cards[-1] # Plays highest value card in valid cards
+            else:
+                valid_cards.sort(key=sortVal)
+                return valid_cards[0] # Minimizes chance of winning trick with low val card
 
 
 class MCTSNode:
@@ -368,11 +504,10 @@ class MCTSNode:
         '''
         self.visits += 1
         if game.team_mode:
-            opp_index = abs(1-self.ai_player_index) # Gets index for opposing team
             ai_team = game.teams[game.ai_team_index]
-            opp_team = game.teams[opp_index]
-            self.score_sum += ((ai_team.score-5*ai_team.bags)-(opp_team.score-5*opp_team.bags)/constant)
-            self.expected_score = ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags)/0.7)
+            opp_team = game.teams[abs(1-game.ai_team_index)]
+            self.score_sum += ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags))/constant
+            #self.expected_score = ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags))/constant
         else:
             highest_score = highest_score_index = 0
             ai_player = game.players[game.ai_player_index]
@@ -382,9 +517,9 @@ class MCTSNode:
                         highest_score = player.score
                         highest_score_index = index
             opp_player = game.players[highest_score_index]
-            self.score_sum += ((ai_player.score-5*ai_player.bags)-(opp_player.score-5*opp_player.bags)/constant)
-            self.expected_score = ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags)/constant)
-        #self.expected_score = self.score_sum/self.visits # Takes the average of all score outcomes
+            self.score_sum += ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags))/constant
+            #self.expected_score = ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags))/constant
+        self.expected_score = self.score_sum/self.visits # Takes the average of all score outcomes
 
 
     def UCT(self, valid_cards, constant = 0.7):
@@ -406,7 +541,7 @@ class MCTSNode:
         max_conf = float('-inf')
         selected_child = None
         for c in explorable_children: # Selects a node to traverse using UCT selection policy
-            child_conf = c.expected_score + constant*np.sqrt(np.log(self.visits))/float(c.visits)
+            child_conf = c.expected_score + constant*(np.sqrt(np.log(self.visits))/float(c.visits))
             if child_conf > max_conf:
                 max_conf = child_conf
                 selected_child = c
@@ -415,13 +550,17 @@ class MCTSNode:
     
 
 class Game():
-    def __init__(self, players, team_mode=False):
+    def __init__(self, players, team_mode=True):
         self.players = players
+        self.curr_player_index = 0
         self.teams = [Team(players[0], players[2]), Team(players[1], players[3])]
         self.discard = []
         self.trick = None
         self.turns_remaining = 13
         self.team_mode = team_mode
+
+    def get_next_player(self):
+        self.curr_player_index = self.curr_player_index + 1 if self.curr_player_index < 3 else 0
 
     def play_card(self):
         pass
@@ -512,7 +651,7 @@ class Game():
         if self.team_mode: # Case if playing with teams
             for team in self.teams:
                 for player in team.members: # Adds each team members score and bag sum to the team score and bag count
-                    if player.bet == 0:
+                    if player.bet == 0: # Special case for nil betting
                         player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
                         team.score += player_round_totals[0] # Round Score
                         team.bags += player_round_totals[1] # Round Bags
@@ -560,25 +699,31 @@ class Game():
 
 
 class SimGame(Game):
-    def __init__(self, players, player_index, ai_player_index = None, team_mode=False):
+    def __init__(self, players, curr_player_index, ai_player_index = None, team_mode=True):
         super().__init__(players, team_mode)
-        self.player_index = player_index
-        self.ai_player_index = ai_player_index if ai_player_index is not None else player_index # Keeps reference of player that initiates the simulation
+        self.curr_player_index = curr_player_index
+        self.ai_player_index = ai_player_index if ai_player_index is not None else curr_player_index # Keeps reference of player that initiates the simulation
         self.ai_team_index = 0 if self.ai_player_index == 0 or self.ai_player_index == 2 else 1
 
     def play_card(self, card):
-        self.trick.cards[self.player_index] = card
-        self.players[self.player_index].hand.remove(card)
+        '''
+        Plays a card within a simulated version of the game
+
+        Parameters:
+        card Card: card object to be played
+        '''
+        self.trick.cards[self.curr_player_index] = card
+        self.players[self.curr_player_index].hand.remove(card)
         if None not in self.trick.cards: # Checks if trick has been completed
             winning_index = self.trick.evaluate_trick()
-            self.players[self.player_index].tricks += 1
-            self.player_index = winning_index
+            self.players[self.curr_player_index].tricks += 1
+            self.curr_player_index = winning_index
             self.turns_remaining -= 1
             self.trick.cards = [None for _ in range(4)]
             if self.turns_remaining == 0:
                 self.assign_score_and_bags()
         else:
-            self.player_index = self.player_index + 1 if self.player_index < 3 else 0
+            self.get_next_player()
 
     def clone_game(self):
         '''
@@ -587,7 +732,7 @@ class SimGame(Game):
         Returns:
         clone SimGame: a deepcopy of the current game state
         '''
-        clone = SimGame(deepcopy(self.players), deepcopy(self.player_index), deepcopy(self.ai_player_index))
+        clone = SimGame(deepcopy(self.players), deepcopy(self.curr_player_index), deepcopy(self.ai_player_index), self.team_mode)
         clone.trick = deepcopy(self.trick)
         clone.turns_remaining = deepcopy(self.turns_remaining)
         return clone
@@ -599,12 +744,12 @@ class SimGame(Game):
         Returns:
         Card[]: array of playable cards
         '''
-        player = self.players[self.player_index]
+        player = self.players[self.curr_player_index]
         return player.get_valid_cards(self.trick.opening_suit, self.trick.spades_broken)
     
 
 class MainGame(Game):
-    def __init__(self, players, team_mode = False):
+    def __init__(self, players, team_mode = True):
         super().__init__(players, team_mode)
 
     def play_card(self, p_index):
@@ -628,7 +773,7 @@ class MainGame(Game):
         self.trick.cards[p_index] = played_card # Places card into the trick pile
 
 
-    def play_round(self, starting_player):
+    def play_round(self, starting_player_index):
         '''
         Plays a hand of Spades, giving each player a turn to play a card
 
@@ -636,19 +781,19 @@ class MainGame(Game):
         starting_player Player: Indicates which player plays the first card
         '''
         self.trick = Trick()
-        p_index = self.players.index(starting_player)
+        self.curr_player_index = starting_player_index
 
         # Plays turn for each of the four players
-        for i in range(4):
-            self.play_card(p_index)
-            p_index = (p_index+1) if (p_index+1) < len(self.players) else 0 # Updates player index 
+        for _ in range(4):
+            self.play_card(self.curr_player_index)
+            self.get_next_player()
         winner_index = self.trick.evaluate_trick()
         self.players[winner_index].tricks += 1
         print(f"Player {winner_index+1} wins the trick! ({val_dict[self.trick.cards[winner_index].val]}-{suit_dict[self.trick.cards[winner_index].suit]})")
         print("-----------")
         self.turns_remaining -= 1
         if self.turns_remaining != 0: # Starts a new round if layers still have cards in their hand
-            self.play_round(self.players[winner_index]) # Winning player begins the new trick
+            self.play_round(winner_index) # Winning player begins the new trick
         else:
             self.assign_score_and_bags() # Tallys points at the end of a round
             self.print_scores()
@@ -682,12 +827,12 @@ class MainGame(Game):
             self.teams[i].tricks = 0
             self.teams[i].bet = 0
         for i in range(4):
-            self.players[i].hand.sort(key=sortFunc) # Sorts player hand
+            self.players[i].hand.sort(key=sortSuitAndVal) # Sorts player hand
             self.players[i].tricks = 0
             self.players[i].make_bet()
             print(f"Player {i+1} Bet = {self.players[i].bet}")
         self.turns_remaining = 13
-        self.play_round(self.players[0])
+        self.play_round(self.curr_player_index)
     
     def initialize_game(self):
         '''
@@ -716,9 +861,9 @@ class MainGame(Game):
         return clone
             
 
-p1 = AIPlayer()
+p1 = RandomPlayer()
 p2 = ISMCTSPlayer()
-p3 = AIPlayer()
+p3 = RandomPlayer()
 p4 = ISMCTSPlayer()  
 g = MainGame([p1,p2,p3,p4], True)      
 g.initialize_game()

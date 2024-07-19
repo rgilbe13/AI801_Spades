@@ -2,6 +2,7 @@ import random
 from copy import deepcopy
 from CommonSpades import *
 from MiniMaxSearch import *
+from MinMaxAlphaBeta import *
 from Card import *
 import time
 
@@ -135,8 +136,8 @@ class AIPlayer(Player):
     def __init__(self, name, team_name):
         super().__init__(name, team_name)
 
-    # def make_bet(self):
-    #     self.bet = random.randint(2,5)
+    def make_bet(self):
+        self.bet = random.randint(2,5)
 
     def make_move(self, game, state):
         valid_hand = self.get_valid_cards(state.current_trick.opening_suit, state.spades_broken)
@@ -155,8 +156,22 @@ class MINMAXPlayer(Player):
             print("Value: ", v)
         return move
     
-    # def make_bet(self):
-    #     self.bet = random.randint(2, 5)
+    def make_bet(self):
+        self.bet = random.randint(2, 5)
+
+
+class MINMAXAlphaBetaPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = alphabeta_search(game, state)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)        
 
 
 class Team:

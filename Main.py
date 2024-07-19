@@ -1,7 +1,7 @@
 from Game import *
 
 p1 = AIPlayer("Tom", "Donkey")
-p2 = AIPlayer("Bruce", "Elephant")
+p2 = MINMAXAlphaBetaPlayer("Bruce", "Elephant")
 p3 = AIPlayer("Randy", "Donkey")
 p4 = MINMAXPlayer("Rex", "Elephant")
 

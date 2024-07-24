@@ -52,6 +52,7 @@ class GameState():
         self.team_mode = False
         self.teams = []
         self.rounds = 1
+        self.time = 0
         starting_player = self.current_player
         if starting_player.team_name != "":
             self.team_mode = True
@@ -300,14 +301,15 @@ class Spades():
         bid_difference = abs(player.tricks - player.bet) + abs(partner.tricks - partner.bet)
         
         heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+
+        if verbose:
+            print("Heuristic: ", heuristic_value)
     
         return heuristic_value        
 
         return 1
 
     def is_terminal(self, state):
-        #print("Cards Laid: ", state.cards_laid)
-        #print("Is Terminal: ", state.cards_laid == 52)
         if state.cards_laid == 52:
             return True
         else:

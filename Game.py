@@ -53,6 +53,8 @@ class GameState():
         self.teams = []
         self.rounds = 1
         self.time = 0
+        self.value = 0
+        self.best_play = None
         starting_player = self.current_player
         if starting_player.team_name != "":
             self.team_mode = True

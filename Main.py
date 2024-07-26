@@ -25,21 +25,22 @@ team_1 = 0
 
 while(count < 50):
     p1 = AIPlayer("Tom", "Donkey")
-    p2 = MINMAXAlphaBetaPlayer("Bruce", "Elephant")
+    p2 = MINMAXAlphaBetaBredthFirstPlayer("Bruce", "Elephant")
     p3 = AIPlayer("Randy", "Donkey")
-    p4 = MINMAXPlayer("Rex", "Elephant")
+    p4 = MINMAXAlphaBetaBredthFirstPlayer("Rex", "Elephant")
 
     p1.set_next_player(p2)
     p2.set_next_player(p3)
     p3.set_next_player(p4)
     p4.set_next_player(p1)
-    count =+ 1    
+    count += 1    
     game = Spades()
     state = GameState(p1)
-    state.deal_hand()  
+    state.new_game()  
 
     state = playGame(game, state)  
 
+    print("Games: ", count)
     print("Rounds: ", state.rounds)
     print("--- %s seconds ---" % state.time)
     print("Team: ", state.teams[0].members[0].name, "/", state.teams[0].members[1].name, " - Score: ", state.teams[0].score)

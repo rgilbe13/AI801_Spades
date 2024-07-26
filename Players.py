@@ -4,6 +4,8 @@ from CommonSpades import *
 from MiniMaxSearch import *
 from MinMaxAlphaBeta import *
 from Card import *
+from MiniMaxDepthLimit import *
+from MiniMaxBreadthFirst import *
 import time
 
 def sortFunc(e):
@@ -173,6 +175,32 @@ class MINMAXAlphaBetaPlayer(Player):
     def make_bet(self):
         self.bet = random.randint(2, 5)        
 
+
+class MINMAXAlphaBetaDepthPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = minimax_depth_limit_search(game, state)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)    
+
+class MINMAXAlphaBetaBredthFirstPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = alphabeta_breadth_first_search(game, state, True)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)    
 
 class Team:
     def __init__(self, p1, p2):

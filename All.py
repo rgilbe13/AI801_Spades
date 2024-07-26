@@ -57,9 +57,6 @@ class Card:
         print(f"{val_dict[self.val]}-{suit_dict[self.suit]}", end=" ")
 import random
 from copy import deepcopy
-from CommonSpades import *
-from MiniMaxSearch import *
-from Card import *
 import time
 
 def sortFunc(e):
@@ -192,8 +189,8 @@ class AIPlayer(Player):
     def __init__(self, name, team_name):
         super().__init__(name, team_name)
 
-    # def make_bet(self):
-    #     self.bet = random.randint(2,5)
+    def make_bet(self):
+        self.bet = random.randint(2,5)
 
     def make_move(self, game, state):
         valid_hand = self.get_valid_cards(state.current_trick.opening_suit, state.spades_broken)
@@ -212,9 +209,49 @@ class MINMAXPlayer(Player):
             print("Value: ", v)
         return move
     
-    # def make_bet(self):
-    #     self.bet = random.randint(2, 5)
+    def make_bet(self):
+        self.bet = random.randint(2, 5)
 
+
+class MINMAXAlphaBetaPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = alphabeta_search(game, state)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)        
+
+
+class MINMAXAlphaBetaDepthPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = minimax_depth_limit_search(game, state)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)    
+
+class MINMAXAlphaBetaBredthFirstPlayer(Player):
+    def __init__(self, name, team_name):
+        super().__init__(name, team_name)
+
+    def make_move(self, game, state):
+        v, move = alphabeta_breadth_first_search(game, state, True)
+        if verbose:
+            print("Value: ", v)
+        return move
+    
+    def make_bet(self):
+        self.bet = random.randint(2, 5)    
 
 class Team:
     def __init__(self, p1, p2):
@@ -237,7 +274,7 @@ def minimax_search(game, state):
         global search_depth
         search_depth += 1
         #time.sleep(2)
-        if game.is_terminal(state) or search_depth > 3000:
+        if game.is_terminal(state) or search_depth > 100:
             return game.utility(state, state.current_player), None
         v, move = -infinity, None
         for a in game.actions(state):
@@ -250,7 +287,7 @@ def minimax_search(game, state):
         global search_depth
         search_depth += 1
         #time.sleep(2)
-        if game.is_terminal(state) or search_depth > 3000:
+        if game.is_terminal(state) or search_depth > 100:
             return game.utility(state, state.current_player), None
         v, move = +infinity, None
         for a in game.actions(state):
@@ -261,15 +298,90 @@ def minimax_search(game, state):
     search_depth = 0
     #state.determinize()
     return max_value(state)
+import math
+import time
+infinity = math.inf
+
+search_depth = 0
+
+def alphabeta_search(game, state):
+    global search_depth
+    player = state.to_move
+
+    def max_value(state, alpha, beta):
+        global search_depth
+        search_depth += 1
+        if game.is_terminal(state) or search_depth > 100:
+            return game.utility(state, state.current_player), None
+        v, move = -infinity, None
+        for a in game.actions(state):
+            v2, _ = min_value(game.result(state, a), alpha, beta)
+            if v2 > v:
+                v, move = v2, a
+                alpha = max(alpha, v)
+            if v >= beta:
+                return v, move
+        return v, move
+
+    def min_value(state, alpha, beta):
+        global search_depth
+        search_depth += 1
+        if game.is_terminal(state) or search_depth > 100:
+            return game.utility(state, state.current_player), None
+        v, move = +infinity, None
+        for a in game.actions(state):
+            v2, _ = max_value(game.result(state, a), alpha, beta)
+            if v2 < v:
+                v, move = v2, a
+                beta = min(beta, v)
+            if v <= alpha:
+                return v, move
+        return v, move
+    
+    search_depth = 0
+    return max_value(state, -infinity, +infinity)
+import math
+import time
+from collections import deque
+infinity = math.inf
+
+def alphabeta_breadth_first_search(game, state, is_maximizing_player):
+    root = state
+    queue = deque([(state, 0)])
+    levels = {}  # Dictionary to store nodes at each level
+
+    # Perform BFS to populate levels dictionary
+    while queue:
+        state, level = queue.popleft()
+        if level not in levels and level < 12:
+            levels[level] = []
+        levels[level].append(state)
+        for action in game.actions(state):
+            queue.append((game.result(state, action), level + 1))
+
+    # Evaluate leaf nodes
+    max_level = max(levels.keys())
+    for state in levels[max_level]:
+        state.value = game.utility(state, state.current_player)
+
+    # Backpropagate values from leaves to root
+    for level in range(max_level - 1, -1, -1):
+        for state in levels[level]:
+            if is_maximizing_player:
+                state.value = max(game.result(state, action) for action in game.actions(state))
+                state.best_play = action
+            else:
+                state.value = min(game.result(state, action) for action in game.actions(state))
+                state.best_play = action
+            is_maximizing_player = not is_maximizing_player
+
+    return root.value, root.best_move
 from collections import namedtuple, Counter, defaultdict
 import random
 
 
 import numpy as np
 from copy import deepcopy
-from CommonSpades import *
-from Card import *
-from Players import *
 
 class Trick:
     def __init__(self):
@@ -315,6 +427,9 @@ class GameState():
         self.team_mode = False
         self.teams = []
         self.rounds = 1
+        self.time = 0
+        self.value = 0
+        self.best_play = None
         starting_player = self.current_player
         if starting_player.team_name != "":
             self.team_mode = True
@@ -563,14 +678,15 @@ class Spades():
         bid_difference = abs(player.tricks - player.bet) + abs(partner.tricks - partner.bet)
         
         heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+
+        if verbose:
+            print("Heuristic: ", heuristic_value)
     
         return heuristic_value        
 
         return 1
 
     def is_terminal(self, state):
-        #print("Cards Laid: ", state.cards_laid)
-        #print("Is Terminal: ", state.cards_laid == 52)
         if state.cards_laid == 52:
             return True
         else:
@@ -579,34 +695,59 @@ class Spades():
     def display(self, state): 
         print(state)
 
-from Game import *
-
-p1 = AIPlayer("Tom", "Donkey")
-p2 = AIPlayer("Bruce", "Elephant")
-p3 = AIPlayer("Randy", "Donkey")
-p4 = MINMAXPlayer("Rex", "Elephant")
-
-p1.set_next_player(p2)
-p2.set_next_player(p3)
-p3.set_next_player(p4)
-p4.set_next_player(p1)
-
-game = Spades()
-state = GameState(p1)
-state.deal_hand()
+import time
 
 
-while state.teams[0].score < 500 and state.teams[1].score < 500:
 
-    player = state.current_player
-    
-    move = player.make_move(game, state)
+def playGame(game, state):
+    start_time = time.time()
+    while state.teams[0].score < 500 and state.teams[1].score < 500:
 
-    print(player," played ", move)
+        player = state.current_player
 
-    state = game.result(state, move)
+        move = player.make_move(game, state)
 
-print("Rounds: ", state.rounds)
-print("Team: ", state.teams[0].members[0].name, "/", state.teams[0].members[1].name, " - Score: ", state.teams[0].score)
-print("Team: ", state.teams[1].members[0].name, "/", state.teams[1].members[1].name, " - Score: ", state.teams[1].score)
-print("end")
+        print(player," played ", move)
+
+        state = game.result(state, move)
+
+    state.time = time.time() - start_time
+    return state        
+
+
+count = 0
+team_0 = 0
+team_1 = 0
+
+while(count < 50):
+    p1 = AIPlayer("Tom", "Donkey")
+    p2 = MINMAXAlphaBetaBredthFirstPlayer("Bruce", "Elephant")
+    p3 = AIPlayer("Randy", "Donkey")
+    p4 = MINMAXAlphaBetaBredthFirstPlayer("Rex", "Elephant")
+
+    p1.set_next_player(p2)
+    p2.set_next_player(p3)
+    p3.set_next_player(p4)
+    p4.set_next_player(p1)
+    count += 1    
+    game = Spades()
+    state = GameState(p1)
+    state.new_game()  
+
+    state = playGame(game, state)  
+
+    print("Games: ", count)
+    print("Rounds: ", state.rounds)
+    print("--- %s seconds ---" % state.time)
+    print("Team: ", state.teams[0].members[0].name, "/", state.teams[0].members[1].name, " - Score: ", state.teams[0].score)
+    print("Team: ", state.teams[1].members[0].name, "/", state.teams[1].members[1].name, " - Score: ", state.teams[1].score)
+
+    if state.teams[0].score > state.teams[1].score:
+        team_0 += 1
+    else:
+        team_1 += 1
+
+    del game
+    del state
+
+print("rounds Played: ", count, " -- Team 0 Total: ", team_0, " - Team 1 Total: ", team_1)

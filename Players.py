@@ -70,12 +70,13 @@ class Player():
             suit_arr.reverse()
             suit_count = len(suit_arr)
             if i == 0: # Case for evaluating Spades
-                for index, card in enumerate(suit_arr):
-                    higher_cards = abs(card.val - 12)
-                    # A spade is worth a trick if it has more spades in hand than number of un-owned higher-ranked spades
-                    if (suit_count > higher_cards-index): 
+                high_value_spades = [card for card in suit_arr if card.val >= 9] # Only concerned with spades of val J-A
+                for index, card in enumerate(high_value_spades):
+                    higher_value_cards = abs(12 - card.val)
+                    # The J-Q-K-A spades are each worth a trick if there are more spades in hand than number of un-owned higher-ranked spades
+                    if (suit_count > higher_value_cards-index): # Subtract number of higher owned cards
                         expected_tricks+=1
-                if suit_count >= 5: # Adds a bet for every spade in hand after the fifth
+                if suit_count >= 5: # Add a trick for every spade in hand over the fourth
                     expected_tricks += suit_count - 4
             else: # Case for non-Spade suits
                 probabilities = self.probability_table[suit_count]
@@ -88,7 +89,7 @@ class Player():
                         expected_tricks += probabilities[2]
                     else:
                         break
-        return round(expected_tricks)
+        return round(expected_tricks) if round(expected_tricks) > 0 else 1
 
     def evaluate_nil_bet(self):
         for i in range(4):
@@ -139,7 +140,8 @@ class AIPlayer(Player):
         super().__init__(name, team_name)
 
     def make_bet(self):
-        self.bet = random.randint(2,5)
+        #self.bet = random.randint(2,5)
+        self.bet = self.evaluate_regular_bet()
 
     def make_move(self, game, state):
         valid_hand = self.get_valid_cards(state.current_trick.opening_suit, state.spades_broken)
@@ -173,7 +175,8 @@ class MINMAXAlphaBetaPlayer(Player):
         return move
     
     def make_bet(self):
-        self.bet = random.randint(2, 5)        
+        # self.bet = random.randint(2, 5)  
+        self.bet = self.evaluate_regular_bet()      
 
 
 class MINMAXAlphaBetaDepthPlayer(Player):

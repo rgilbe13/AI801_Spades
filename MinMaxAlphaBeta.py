@@ -1,5 +1,6 @@
 import math
 import time
+from CommonSpades import *
 infinity = math.inf
 
 search_depth = 0
@@ -11,7 +12,7 @@ def alphabeta_search(game, state):
     def max_value(state, alpha, beta):
         global search_depth
         search_depth += 1
-        if game.is_terminal(state) or search_depth > 100:
+        if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
         v, move = -infinity, None
         for a in game.actions(state):
@@ -26,7 +27,7 @@ def alphabeta_search(game, state):
     def min_value(state, alpha, beta):
         global search_depth
         search_depth += 1
-        if game.is_terminal(state) or search_depth > 100:
+        if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
         v, move = +infinity, None
         for a in game.actions(state):

@@ -51,7 +51,7 @@ class GameState():
         self.cards_laid = 0
         self.team_mode = False
         self.teams = []
-        self.rounds = 1
+        self.rounds = 0
         self.time = 0
         self.value = 0
         self.best_play = None
@@ -190,15 +190,12 @@ class GameState():
         self.deal_hand()
         for _ in range(4):
             self.current_player.make_bet()
+            self.current_player.tricks = 0
+            self.current_player.bags = 0
             self.update_current_player(self.current_player.next_player)        
 
     def get_player_score_and_bags(self, bet, tricks):
-
-        if bet == 0:
-            score, bags = self.check_nil_bet(tricks)
-        else:
-            score, bags = self.get_round_score(bet, tricks)
-        return score, bags
+        return self.get_round_score(bet, tricks)
     
     def get_round_score(self, bet, tricks):
 
@@ -206,48 +203,24 @@ class GameState():
         bags = tricks-bet if tricks > bet else 0 # Adds bags to player total if bet was exceeded
         return score, bags
     
-    def check_nil_bet(self, tricks):
-
-        if tricks == 0:
-            score = 100
-            bags = 0
-        else:
-            score = -100
-            bags = tricks
-        return score, bags
-
     def assign_score_and_bags(self):
- 
-        if self.team_mode: # Case if playing with teams
-            for team in self.teams:
-                for player in team.members: # Adds each team members score and bag sum to the team score and bag count
-                    if player.bet == 0:
-                        player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                        team.score += player_round_totals[0] # Round Score
-                        team.bags += player_round_totals[1] # Round Bags
-                    else:
-                        team.tricks += player.tricks
-                        team.bet += player.bet
-                round_totals = self.get_round_score(team.bet, team.tricks)
-                team.score += round_totals[0]
-                team.bags += round_totals[1]
-                if team.bags >= 10: # Check for bag penalty
-                    team.score -= 100
-                    team.bags -= 10
-        else: # Case if playing individually
-            for player in self.players:
-                round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                player.score += round_totals[0] # Round Score
-                player.bags += round_totals[1] # Round Bags
-                if player.bags >= 10:
-                    player.score -= 100
-                    player.bags -= 10
+        for team in self.teams:
+            for player in team.members: # Adds each team members score and bag sum to the team score and bag count
+                team.tricks += player.tricks
+                team.bet += player.bet
+
+            round_totals = self.get_round_score(team.bet, team.tricks)
+            team.score += round_totals[0]
+            team.bags += round_totals[1]
+            if team.bags >= 10: # Check for bag penalty
+                team.score -= 100
+                team.bags -= 10
     
     def check_for_winner(self, player_array):
 
         is_winner = False
         for p in player_array:
-            if p.score > 500:
+            if p.score > global_max_score:
                 is_winner = True
                 break
         return is_winner

@@ -130,15 +130,13 @@ class GameState():
         if verbose:
             print(self.current_player, "is the winner")
 
-        if self.cards_laid == 52:
-            self.end_round()
 
     def end_round(self):
         self.assign_score_and_bags() # Tallys points at the end of a round
         #self.print_scores()
-        is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
-        if not is_winner:
-            self.new_game()
+        #is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
+        #if not is_winner:
+        self.new_game()
 
 
     def update_current_player(self, player):
@@ -275,14 +273,18 @@ class Spades():
         
         bid_difference = abs(player.tricks - player.bet) + abs(partner.tricks - partner.bet)
         
-        heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+        #heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+        total_tricks = player.tricks + partner.tricks + expected_tricks
+        if total_tricks > team_bet:
+            heuristic_value =  13 - abs((team_bet - total_tricks) // 4)
+        else:
+            heuristic_value =  13 - abs(team_bet - total_tricks)
 
         if verbose:
             print("Heuristic: ", heuristic_value)
     
         return heuristic_value        
 
-        return 1
 
     def is_terminal(self, state):
         if state.cards_laid == 52:

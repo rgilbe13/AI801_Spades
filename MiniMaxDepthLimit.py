@@ -2,19 +2,13 @@ import math
 import time
 infinity = math.inf
 
-search_depth = 0
-
 def minimax_depth_limit_search(game, state):
     global search_depth
     player = state.to_move
 
     def max_value(state, alpha, beta):
         global search_depth
-        search_depth += 1
-        if game.is_terminal(state) or search_depth > 12:
-            print("Depth: ", search_depth)
-            print("H:", game.utility(state, state.current_player))
-            search_depth = 0
+        if game.is_terminal(state) or state.cards_laid >= search_depth:
             return game.utility(state, state.current_player), None
         v, move = -infinity, None
         for a in game.actions(state):
@@ -28,11 +22,7 @@ def minimax_depth_limit_search(game, state):
 
     def min_value(state, alpha, beta):
         global search_depth
-        search_depth += 1
-        if game.is_terminal(state) or search_depth > 12:
-            print("Depth: ", search_depth)
-            print("H:", game.utility(state, state.current_player))
-            search_depth = 0
+        if game.is_terminal(state) or state.cards_laid >= search_depth:
             return game.utility(state, state.current_player), None
         v, move = +infinity, None
         for a in game.actions(state):
@@ -44,5 +34,5 @@ def minimax_depth_limit_search(game, state):
                 return v, move
         return v, move
     
-    search_depth = 0
+    search_depth = (4 - state.cards_laid) + 8
     return max_value(state, -infinity, +infinity)

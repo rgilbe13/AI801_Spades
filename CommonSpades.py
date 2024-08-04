@@ -11,8 +11,8 @@ def cache(func):
 
 verbose=False
 global_search_depth = 100
-global_max_score = 200
-global_round_count = 50
+global_max_score = 250
+global_round_count = 100
 
 class Phase(Enum):
     BID = 1

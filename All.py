@@ -10,6 +10,9 @@ def cache(func):
     return func
 
 verbose=False
+global_search_depth = 250000
+global_max_score = 200
+global_round_count = 10
 
 class Phase(Enum):
     BID = 1
@@ -121,12 +124,13 @@ class Player():
             suit_arr.reverse()
             suit_count = len(suit_arr)
             if i == 0: # Case for evaluating Spades
-                for index, card in enumerate(suit_arr):
-                    higher_cards = abs(card.val - 12)
-                    # A spade is worth a trick if it has more spades in hand than number of un-owned higher-ranked spades
-                    if (suit_count > higher_cards-index): 
+                high_value_spades = [card for card in suit_arr if card.val >= 9] # Only concerned with spades of val J-A
+                for index, card in enumerate(high_value_spades):
+                    higher_value_cards = abs(12 - card.val)
+                    # The J-Q-K-A spades are each worth a trick if there are more spades in hand than number of un-owned higher-ranked spades
+                    if (suit_count > higher_value_cards-index): # Subtract number of higher owned cards
                         expected_tricks+=1
-                if suit_count >= 5: # Adds a bet for every spade in hand after the fifth
+                if suit_count >= 5: # Add a trick for every spade in hand over the fourth
                     expected_tricks += suit_count - 4
             else: # Case for non-Spade suits
                 probabilities = self.probability_table[suit_count]
@@ -139,7 +143,7 @@ class Player():
                         expected_tricks += probabilities[2]
                     else:
                         break
-        return round(expected_tricks)
+        return round(expected_tricks) if round(expected_tricks) > 0 else 1
 
     def evaluate_nil_bet(self):
         for i in range(4):
@@ -190,7 +194,8 @@ class AIPlayer(Player):
         super().__init__(name, team_name)
 
     def make_bet(self):
-        self.bet = random.randint(2,5)
+        #self.bet = random.randint(2,5)
+        self.bet = self.evaluate_regular_bet()
 
     def make_move(self, game, state):
         valid_hand = self.get_valid_cards(state.current_trick.opening_suit, state.spades_broken)
@@ -224,7 +229,8 @@ class MINMAXAlphaBetaPlayer(Player):
         return move
     
     def make_bet(self):
-        self.bet = random.randint(2, 5)        
+        # self.bet = random.randint(2, 5)  
+        self.bet = self.evaluate_regular_bet()      
 
 
 class MINMAXAlphaBetaDepthPlayer(Player):
@@ -311,7 +317,7 @@ def alphabeta_search(game, state):
     def max_value(state, alpha, beta):
         global search_depth
         search_depth += 1
-        if game.is_terminal(state) or search_depth > 100:
+        if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
         v, move = -infinity, None
         for a in game.actions(state):
@@ -326,7 +332,7 @@ def alphabeta_search(game, state):
     def min_value(state, alpha, beta):
         global search_depth
         search_depth += 1
-        if game.is_terminal(state) or search_depth > 100:
+        if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
         v, move = +infinity, None
         for a in game.actions(state):
@@ -426,7 +432,7 @@ class GameState():
         self.cards_laid = 0
         self.team_mode = False
         self.teams = []
-        self.rounds = 1
+        self.rounds = 0
         self.time = 0
         self.value = 0
         self.best_play = None
@@ -565,15 +571,12 @@ class GameState():
         self.deal_hand()
         for _ in range(4):
             self.current_player.make_bet()
+            self.current_player.tricks = 0
+            self.current_player.bags = 0
             self.update_current_player(self.current_player.next_player)        
 
     def get_player_score_and_bags(self, bet, tricks):
-
-        if bet == 0:
-            score, bags = self.check_nil_bet(tricks)
-        else:
-            score, bags = self.get_round_score(bet, tricks)
-        return score, bags
+        return self.get_round_score(bet, tricks)
     
     def get_round_score(self, bet, tricks):
 
@@ -581,48 +584,24 @@ class GameState():
         bags = tricks-bet if tricks > bet else 0 # Adds bags to player total if bet was exceeded
         return score, bags
     
-    def check_nil_bet(self, tricks):
-
-        if tricks == 0:
-            score = 100
-            bags = 0
-        else:
-            score = -100
-            bags = tricks
-        return score, bags
-
     def assign_score_and_bags(self):
- 
-        if self.team_mode: # Case if playing with teams
-            for team in self.teams:
-                for player in team.members: # Adds each team members score and bag sum to the team score and bag count
-                    if player.bet == 0:
-                        player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                        team.score += player_round_totals[0] # Round Score
-                        team.bags += player_round_totals[1] # Round Bags
-                    else:
-                        team.tricks += player.tricks
-                        team.bet += player.bet
-                round_totals = self.get_round_score(team.bet, team.tricks)
-                team.score += round_totals[0]
-                team.bags += round_totals[1]
-                if team.bags >= 10: # Check for bag penalty
-                    team.score -= 100
-                    team.bags -= 10
-        else: # Case if playing individually
-            for player in self.players:
-                round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                player.score += round_totals[0] # Round Score
-                player.bags += round_totals[1] # Round Bags
-                if player.bags >= 10:
-                    player.score -= 100
-                    player.bags -= 10
+        for team in self.teams:
+            for player in team.members: # Adds each team members score and bag sum to the team score and bag count
+                team.tricks += player.tricks
+                team.bet += player.bet
+
+            round_totals = self.get_round_score(team.bet, team.tricks)
+            team.score += round_totals[0]
+            team.bags += round_totals[1]
+            if team.bags >= 10: # Check for bag penalty
+                team.score -= 100
+                team.bags -= 10
     
     def check_for_winner(self, player_array):
 
         is_winner = False
         for p in player_array:
-            if p.score > 500:
+            if p.score > global_max_score:
                 is_winner = True
                 break
         return is_winner
@@ -696,18 +675,33 @@ class Spades():
         print(state)
 
 import time
+import csv
+
+def writeToCSV(state, team_0_name, team_1_name):
+    # global_search_depth, global_max_depth, team 0, team 0 bid, team 0 score, team 1, team 1 bid, team 1 score, num of rounds, total time
+    
+    new_data = [
+    [global_search_depth, global_max_score, team_0_name, state.teams[0].bet, state.teams[0].tricks, state.teams[0].score, team_1_name, state.teams[1].bet, state.teams[1].tricks, state.teams[1].score, state.rounds, state.time]
+    ]
+
+    file_path = 'results_nolimit.csv'
+
+    # Append data to CSV file
+    with open(file_path, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerows(new_data)
 
 
 
 def playGame(game, state):
     start_time = time.time()
-    while state.teams[0].score < 500 and state.teams[1].score < 500:
+    while state.teams[0].score < global_max_score and state.teams[1].score < global_max_score:
 
         player = state.current_player
 
         move = player.make_move(game, state)
 
-        print(player," played ", move)
+        #print(player," played ", move)
 
         state = game.result(state, move)
 
@@ -718,12 +712,14 @@ def playGame(game, state):
 count = 0
 team_0 = 0
 team_1 = 0
+team_0_name = None
+team_1_name = None
 
-while(count < 50):
+while(count < global_round_count):
     p1 = AIPlayer("Tom", "Donkey")
-    p2 = MINMAXAlphaBetaBredthFirstPlayer("Bruce", "Elephant")
+    p2 = MINMAXAlphaBetaPlayer("Bruce", "Elephant")
     p3 = AIPlayer("Randy", "Donkey")
-    p4 = MINMAXAlphaBetaBredthFirstPlayer("Rex", "Elephant")
+    p4 = MINMAXAlphaBetaPlayer("Rex", "Elephant")
 
     p1.set_next_player(p2)
     p2.set_next_player(p3)
@@ -732,22 +728,21 @@ while(count < 50):
     count += 1    
     game = Spades()
     state = GameState(p1)
-    state.new_game()  
+    state.new_game()
+    total_time = 0;  
 
     state = playGame(game, state)  
-
-    print("Games: ", count)
-    print("Rounds: ", state.rounds)
-    print("--- %s seconds ---" % state.time)
-    print("Team: ", state.teams[0].members[0].name, "/", state.teams[0].members[1].name, " - Score: ", state.teams[0].score)
-    print("Team: ", state.teams[1].members[0].name, "/", state.teams[1].members[1].name, " - Score: ", state.teams[1].score)
+    total_time += state.time
 
     if state.teams[0].score > state.teams[1].score:
         team_0 += 1
     else:
         team_1 += 1
 
+    team_0_name = state.teams[0].members[0].name + "/" + state.teams[0].members[1].name
+    team_1_name = state.teams[1].members[0].name  + "/" + state.teams[1].members[1].name
+
+    writeToCSV(state, team_0_name, team_1_name)
+
     del game
     del state
-
-print("rounds Played: ", count, " -- Team 0 Total: ", team_0, " - Team 1 Total: ", team_1)

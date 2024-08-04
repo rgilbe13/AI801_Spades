@@ -9,7 +9,7 @@ def writeToCSV(state, team_0_name, team_1_name):
     [global_search_depth, global_max_score, team_0_name, state.teams[0].bet, state.teams[0].tricks, state.teams[0].score, team_1_name, state.teams[1].bet, state.teams[1].tricks, state.teams[1].score, state.rounds, state.time]
     ]
 
-    file_path = 'results.csv'
+    file_path = "rerun_" + str(global_search_depth) + ".csv"
 
     # Append data to CSV file
     with open(file_path, 'a', newline='') as csvfile:
@@ -21,12 +21,15 @@ def writeToCSV(state, team_0_name, team_1_name):
 def playGame(game, state):
     start_time = time.time()
     while state.teams[0].score < global_max_score and state.teams[1].score < global_max_score:
+        
+        if state.cards_laid == 52:
+            state.end_round()     
 
         player = state.current_player
 
         move = player.make_move(game, state)
 
-        #print(player," played ", move)
+        #print(player," played ", move)   
 
         state = game.result(state, move)
 

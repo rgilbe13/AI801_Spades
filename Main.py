@@ -10,6 +10,7 @@ def writeToCSV(state, team_0_name, team_1_name):
     ]
 
     file_path = "rerun_" + str(global_search_depth) + ".csv"
+    #file_path = "depth_12.csv"
 
     # Append data to CSV file
     with open(file_path, 'a', newline='') as csvfile:

@@ -2,6 +2,8 @@ import math
 import time
 infinity = math.inf
 
+search_depth = 0
+
 def minimax_depth_limit_search(game, state):
     global search_depth
     player = state.to_move
@@ -34,5 +36,5 @@ def minimax_depth_limit_search(game, state):
                 return v, move
         return v, move
     
-    search_depth = (4 - state.cards_laid) + 8
+    search_depth = state.cards_laid + (4 - len(state.current_trick.cards)) + 8
     return max_value(state, -infinity, +infinity)

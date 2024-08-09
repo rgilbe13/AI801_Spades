@@ -10,9 +10,9 @@ def cache(func):
     return func
 
 verbose=False
-global_search_depth = 250000
-global_max_score = 200
-global_round_count = 10
+global_search_depth = 100
+global_max_score = 250
+global_round_count = 100
 
 class Phase(Enum):
     BID = 1
@@ -307,15 +307,18 @@ def minimax_search(game, state):
 import math
 import time
 infinity = math.inf
-
+num_of_actions = 0
 search_depth = 0
 
 def alphabeta_search(game, state):
     global search_depth
+    global num_of_actions
     player = state.to_move
 
     def max_value(state, alpha, beta):
         global search_depth
+        global num_of_actions
+        num_of_actions += len(game.actions(state))
         search_depth += 1
         if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
@@ -331,6 +334,8 @@ def alphabeta_search(game, state):
 
     def min_value(state, alpha, beta):
         global search_depth
+        global num_of_actions
+        num_of_actions += len(game.actions(state))
         search_depth += 1
         if game.is_terminal(state) or search_depth > global_search_depth:
             return game.utility(state, state.current_player), None
@@ -511,15 +516,13 @@ class GameState():
         if verbose:
             print(self.current_player, "is the winner")
 
-        if self.cards_laid == 52:
-            self.end_round()
 
     def end_round(self):
         self.assign_score_and_bags() # Tallys points at the end of a round
         #self.print_scores()
-        is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
-        if not is_winner:
-            self.new_game()
+        #is_winner = self.check_for_winner(self.teams) # if self.team_mode else self.check_for_winner(self.players)
+        #if not is_winner:
+        self.new_game()
 
 
     def update_current_player(self, player):
@@ -656,14 +659,18 @@ class Spades():
         
         bid_difference = abs(player.tricks - player.bet) + abs(partner.tricks - partner.bet)
         
-        heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+        #heuristic_value = (player.tricks + partner.tricks) + expected_tricks + lead_control_points - bid_difference
+        total_tricks = player.tricks + partner.tricks + expected_tricks
+        if total_tricks > team_bet:
+            heuristic_value =  13 - abs((team_bet - total_tricks) // 4)
+        else:
+            heuristic_value =  13 - abs(team_bet - total_tricks)
 
         if verbose:
             print("Heuristic: ", heuristic_value)
     
         return heuristic_value        
 
-        return 1
 
     def is_terminal(self, state):
         if state.cards_laid == 52:
@@ -684,7 +691,8 @@ def writeToCSV(state, team_0_name, team_1_name):
     [global_search_depth, global_max_score, team_0_name, state.teams[0].bet, state.teams[0].tricks, state.teams[0].score, team_1_name, state.teams[1].bet, state.teams[1].tricks, state.teams[1].score, state.rounds, state.time]
     ]
 
-    file_path = 'results_nolimit.csv'
+    #file_path = "rerun_" + str(global_search_depth) + ".csv"
+    file_path = "depth_12.csv"
 
     # Append data to CSV file
     with open(file_path, 'a', newline='') as csvfile:
@@ -696,12 +704,15 @@ def writeToCSV(state, team_0_name, team_1_name):
 def playGame(game, state):
     start_time = time.time()
     while state.teams[0].score < global_max_score and state.teams[1].score < global_max_score:
+        
+        if state.cards_laid == 52:
+            state.end_round()     
 
         player = state.current_player
 
         move = player.make_move(game, state)
 
-        #print(player," played ", move)
+        #print(player," played ", move)   
 
         state = game.result(state, move)
 
@@ -717,9 +728,9 @@ team_1_name = None
 
 while(count < global_round_count):
     p1 = AIPlayer("Tom", "Donkey")
-    p2 = MINMAXAlphaBetaPlayer("Bruce", "Elephant")
+    p2 = MINMAXAlphaBetaDepthPlayer("Bruce", "Elephant")
     p3 = AIPlayer("Randy", "Donkey")
-    p4 = MINMAXAlphaBetaPlayer("Rex", "Elephant")
+    p4 = MINMAXAlphaBetaDepthPlayer("Rex", "Elephant")
 
     p1.set_next_player(p2)
     p2.set_next_player(p3)

@@ -1,19 +1,19 @@
 import time
 import random
 import math
-import numpy as np
 from copy import deepcopy
 
 from Players import Player
 
 class ISMCTSPlayer(Player):
-    def __init__(self):
+    def __init__(self, iterations):
         super().__init__()
+        self.iterations = iterations
 
     def sortVal(self, e):
         return e.val
 
-    def make_move(self, game, iterations = 500):
+    def make_move(self, game):
         '''
         Chooses card to play using ISMCTS
 
@@ -31,10 +31,10 @@ class ISMCTSPlayer(Player):
             start = time.time()
             unseen_cards = self.get_unseen_cards(game) # Cards that are yet to be played from other players
             #iterations = iterations+(int(iterations/2)*(13-game.turns_remaining))
-            for _ in range(iterations):
+            for _ in range(self.iterations):
                 node = root
                 clone_game = self.determinize(game.clone_game(), deepcopy(unseen_cards)) # Randomizes non-player hands
-                self.MCTS(clone_game, node, min_visits = iterations/10)
+                self.MCTS(clone_game, node)
             max_visits = 0
             move = None
             for child in root.children:
@@ -106,7 +106,7 @@ class ISMCTSPlayer(Player):
                     unseen_cards.pop(0) 
         return game
 
-    def MCTS(self, game, node, min_visits):
+    def MCTS(self, game, node):
         '''
         Implementation of the ISMCTS algorithm, simulates a round and updates node stats
 
@@ -115,12 +115,12 @@ class ISMCTSPlayer(Player):
         node Node: root of the search tree beginning the the MCTS player's initial turn
         '''
 
-        # Select child nodes up to a leaf
+        # Select child nodes up to a leaf or non-fully expanded node
         while len(node.children) > 0:
             valid_cards = game.get_player_valid_cards()
             if node.is_fully_expanded(valid_cards):
                 is_opponent = (game.players[game.curr_player_index] not in game.teams[game.ai_team_index].members) # Checks if player is on the AI's team
-                node = node.UCT(valid_cards, min_visits, is_opponent)
+                node = node.UCT(valid_cards, is_opponent)
                 game.play_card(node.last_card)
             else:
                 break
@@ -130,10 +130,8 @@ class ISMCTSPlayer(Player):
         valid_cards =  game.get_player_valid_cards()
         valid_cards[:] = [card for card in valid_cards if card not in child_cards]
         if len(valid_cards) > 0:
-            #random_card = random.choice(valid_cards)
             probable_card = self.guess_next_card(game, valid_cards)
             child = MCTSNode(node, probable_card, game.players[game.curr_player_index])
-            # child.visits += child.last_card.val
             node.children.append(child)
             game.play_card(probable_card)
             node = child
@@ -283,26 +281,19 @@ class MCTSNode:
         constant float: used for deriving the statistic
         '''
         self.visits += 1
-        if game.team_mode:
-            ai_team = game.teams[game.ai_team_index]
-            opp_team = game.teams[abs(1-game.ai_team_index)]
-            self.score_sum += ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags))/constant
-            #self.expected_score = ((ai_team.score-10*ai_team.bags)-(opp_team.score-10*opp_team.bags))/constant
-        else:
-            highest_score = highest_score_index = 0
-            ai_player = game.players[game.ai_player_index]
-            for index, player in enumerate(game.players):
-                if player != ai_player:
-                    if player.score > highest_score:
-                        highest_score = player.score
-                        highest_score_index = index
-            opp_player = game.players[highest_score_index]
-            self.score_sum += ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags))/constant
-            #self.expected_score = ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags))/constant
+        highest_score = highest_score_index = 0
+        ai_player = game.players[game.ai_player_index]
+        for index, player in enumerate(game.players):
+            if player != ai_player:
+                if player.score > highest_score:
+                    highest_score = player.score
+                    highest_score_index = index
+        opp_player = game.players[highest_score_index]
+        self.score_sum += ((ai_player.score-10*ai_player.bags)-(opp_player.score-10*opp_player.bags))/constant
         self.expected_score = self.score_sum/self.visits # Takes the average of all score outcomes
 
 
-    def UCT(self, valid_cards, min_visits, is_opponent, constant = 0.7):
+    def UCT(self, valid_cards, is_opponent, constant = 0.7):
         '''
         Selection policy for chosing a node in the tree
 
@@ -315,11 +306,7 @@ class MCTSNode:
         '''
         explorable_children = []
         child_cards = [child.last_card for child in self.children]
-        if self.parent == None:
-            for child in self.children:
-                if child.visits < min_visits: # Asserts that each of root children are visited a set number of times
-                    return child
-
+       
         # Gets moves that are possible in current determinization
         for index, card in enumerate(child_cards):
             if card in valid_cards:
@@ -329,7 +316,7 @@ class MCTSNode:
         min_conf = float('inf')
         selected_child = None
         for c in explorable_children: # Selects a node to traverse using UCT selection policy
-            child_conf = c.expected_score + constant*(np.sqrt(np.log(self.visits))/float(c.visits))
+            child_conf = c.expected_score + constant*(math.sqrt(math.log(self.visits))/float(c.visits))
             if not is_opponent and child_conf > max_conf:
                 max_conf = child_conf
                 selected_child = c

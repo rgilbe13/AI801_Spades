@@ -1,0 +1,5 @@
+MCTS player wins: 57 (Win%: 0.57) 
+Random player wins: 43 (Win%: 0.43) 
+6241.25877904892 seconds to completionMCTS player wins: 5 (Win%: 1.0) 
+Random player wins: 0 (Win%: 0.0) 
+175.07144784927368 seconds to completion

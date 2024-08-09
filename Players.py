@@ -13,6 +13,7 @@ class Player:
         self.tricks = 0
         self.bags = 0
         self.score = 0
+        self.next_player = None
 
         # Used for clearly displaying the cards
         self.suit_dict = {0: '♠', 1: '♣', 2: '♥', 3: '♦'}
@@ -46,18 +47,22 @@ class Player:
     def sortSuitAndVal(self, e):
         return e.suit, e.val
     
+    def set_next_player(self, player):
+        self.next_player = player
+    
     def make_bet(self):
         '''
         Evaluates hand and given PT to make a viable bet
         '''
         nil_bet = False
-        expected_tricks = self.evaluate_regular_bet()
-        if expected_tricks == 1 and Card(0, 12) not in self.hand:
-            nil_bet = self.evaluate_nil_bet()
-        self.bet = 0 if nil_bet else expected_tricks
+        expected_tricks = self.evaluate_hand()
+        self.bet = expected_tricks
+        # if expected_tricks == 1 and Card(0, 12) not in self.hand:
+        #     nil_bet = self.evaluate_nil_bet()
+        # self.bet = 0 if nil_bet else expected_tricks
 
 
-    def evaluate_regular_bet(self):
+    def evaluate_hand(self):
         '''
         Iterates through the different suits to determine the expected trick take
 

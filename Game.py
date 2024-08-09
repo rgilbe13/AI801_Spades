@@ -4,16 +4,18 @@ from copy import deepcopy
 from Card import Card, Trick
 from ISMCTS import ISMCTSPlayer
 
+from Minimax.All import MINMAXAlphaBetaPlayer, GameState
+
+import time
 
 class Game():
-    def __init__(self, players, team_mode=True):
+    def __init__(self, players):
         self.players = players
         self.curr_player_index = 0
         self.teams = [Team(players[0], players[2]), Team(players[1], players[3])]
         self.discard = []
         self.trick = None
         self.turns_remaining = 13
-        self.team_mode = team_mode
 
     def sortSuitAndVal(self, e):
         return e.suit, e.val
@@ -110,30 +112,21 @@ class Game():
         '''
         Tallies score and bags for all players/teams, starts new round if win condition not met by anyone
         '''
-        if self.team_mode: # Case if playing with teams
-            for team in self.teams:
-                for player in team.members: # Adds each team members score and bag sum to the team score and bag count
-                    if player.bet == 0: # Special case for nil betting
-                        player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                        team.score += player_round_totals[0] # Round Score
-                        team.bags += player_round_totals[1] # Round Bags
-                    else:
-                        team.tricks += player.tricks
-                        team.bet += player.bet
-                round_totals = self.get_round_score(team.bet, team.tricks)
-                team.score += round_totals[0]
-                team.bags += round_totals[1]
-                if team.bags >= 10: # Check for bag penalty
-                    team.score -= 100
-                    team.bags -= 10
-        else: # Case if playing individually
-            for player in self.players:
-                round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
-                player.score += round_totals[0] # Round Score
-                player.bags += round_totals[1] # Round Bags
-                if player.bags >= 10:
-                    player.score -= 100
-                    player.bags -= 10
+        for team in self.teams:
+            for player in team.members: # Adds each team members score and bag sum to the team score and bag count
+                if player.bet == 0: # Special case for nil betting
+                    player_round_totals = self.get_player_score_and_bags(player.bet, player.tricks)
+                    team.score += player_round_totals[0] # Round Score
+                    team.bags += player_round_totals[1] # Round Bags
+                else:
+                    team.tricks += player.tricks
+                    team.bet += player.bet
+            round_totals = self.get_round_score(team.bet, team.tricks)
+            team.score += round_totals[0]
+            team.bags += round_totals[1]
+            if team.bags >= 10: # Check for bag penalty
+                team.score -= 100
+                team.bags -= 10
     
     def check_for_winner(self, player_array, threshold = 250):
         '''
@@ -146,23 +139,20 @@ class Game():
         '''
         is_winner = False
         for p in player_array:
-            if p.score >= threshold:
+            if p.score >= threshold or p.score <= -threshold:
                 is_winner = True
                 break
         return is_winner
         
     def print_scores(self):
-        if self.team_mode:
-            for t in self.teams:
-                print(t.score,"(",t.bags,")")
-        else:
-            for p in self.players:
-                print(p.score,"(",p.bags,")")
+        for t in self.teams:
+            print(t.score,"(",t.bags,")")
+     
 
 
 class SimGame(Game):
-    def __init__(self, players, curr_player_index, ai_player_index = None, team_mode=True):
-        super().__init__(players, team_mode)
+    def __init__(self, players, curr_player_index, ai_player_index = None):
+        super().__init__(players)
         self.curr_player_index = curr_player_index
         self.ai_player_index = ai_player_index if ai_player_index is not None else curr_player_index # Keeps reference of player that initiates the simulation
         self.ai_team_index = 0 if self.ai_player_index == 0 or self.ai_player_index == 2 else 1
@@ -194,7 +184,7 @@ class SimGame(Game):
         Returns:
         clone SimGame: a deepcopy of the current game state
         '''
-        clone = SimGame(deepcopy(self.players), deepcopy(self.curr_player_index), deepcopy(self.ai_player_index), self.team_mode)
+        clone = SimGame(deepcopy(self.players), deepcopy(self.curr_player_index), deepcopy(self.ai_player_index))
         clone.trick = deepcopy(self.trick)
         clone.turns_remaining = deepcopy(self.turns_remaining)
         return clone
@@ -211,8 +201,8 @@ class SimGame(Game):
     
 
 class MainGame(Game):
-    def __init__(self, players, team_mode = True):
-        super().__init__(players, team_mode)
+    def __init__(self, players):
+        super().__init__(players)
         self.suit_dict = {0: '♠', 1: '♣', 2: '♥', 3: '♦'}
         self.val_dict = {0: '2', 1: '3', 2: '4', 3: '5',
                         4: '6', 5: '7', 6: '8', 7: '9',
@@ -229,6 +219,8 @@ class MainGame(Game):
         current_p = self.players[p_index]
         if isinstance(current_p, ISMCTSPlayer): # Handles case for MCTS AI
             played_card = current_p.make_move(self.clone_game(p_index))
+        elif isinstance(current_p, MINMAXAlphaBetaPlayer):
+            played_card = current_p.make_move(self.clone_game(p_index), GameState(current_p))
         else:
             played_card = current_p.make_move(self.trick)
         self.discard.append(played_card)
@@ -274,18 +266,11 @@ class MainGame(Game):
         '''
         highest_score = 0
         winning_index = 0
-        if self.team_mode:
-            for index, team in enumerate(self.teams):
-                if team.score > highest_score:
-                    winning_index = index
-                    highest_score = team.score
-            print(f"Team {winning_index+1} wins!")
-        else:
-            for index, player in enumerate(self.players):
-                if player.score > highest_score:
-                    winning_index = index
-                    highest_score = player.score
-            print(f"Player {winning_index+1} wins!")
+        for index, team in enumerate(self.teams):
+            if team.score > highest_score:
+                winning_index = index
+                highest_score = team.score
+        print(f"Team {winning_index+1} wins!")
 
     def start_new_set(self):
         '''
@@ -301,7 +286,11 @@ class MainGame(Game):
             self.players[i].make_bet()
             print(f"Player {i+1} Bet = {self.players[i].bet}")
         self.turns_remaining = 13
+        start = time.time()
         self.play_round(self.curr_player_index)
+        end = time.time()
+        duration = end - start
+        print (f'Round Time: {duration}')
     
     def initialize_game(self):
         '''

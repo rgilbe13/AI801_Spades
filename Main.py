@@ -9,7 +9,7 @@ def writeToCSV(state, team_0_name, team_1_name):
     [global_search_depth, global_max_score, team_0_name, state.teams[0].bet, state.teams[0].tricks, state.teams[0].score, team_1_name, state.teams[1].bet, state.teams[1].tricks, state.teams[1].score, state.rounds, state.time]
     ]
 
-    file_path = "rerun_" + str(global_search_depth) + ".csv"
+    file_path = "depth_test_" + str(global_search_depth) + ".csv"
     #file_path = "depth_12.csv"
 
     # Append data to CSV file
@@ -46,9 +46,9 @@ team_1_name = None
 
 while(count < global_round_count):
     p1 = AIPlayer("Tom", "Donkey")
-    p2 = MINMAXAlphaBetaPlayer("Bruce", "Elephant")
+    p2 = MINMAXAlphaBetaDepthPlayer("Bruce", "Elephant")
     p3 = AIPlayer("Randy", "Donkey")
-    p4 = MINMAXAlphaBetaPlayer("Rex", "Elephant")
+    p4 = MINMAXAlphaBetaDepthPlayer("Rex", "Elephant")
 
     p1.set_next_player(p2)
     p2.set_next_player(p3)
